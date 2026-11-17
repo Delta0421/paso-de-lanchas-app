@@ -44,6 +44,9 @@ docs/                contexto del proyecto y decisiones de arquitectura (ADR)
 - Mensajes de commit con **Conventional Commits**: `feat(boarding): cobrar y asignar lugar al escanear QR`.
 - Guía completa: [CONTRIBUTING.md](https://github.com/paso-de-lanchas/.github/blob/main/CONTRIBUTING.md).
 
+Para preparar tu computadora (Git, Node, Docker y la base de datos local), sigue
+[docs/ENTORNO_DESARROLLO.md](docs/ENTORNO_DESARROLLO.md).
+
 Antes de empezar, lee [CLAUDE.md](CLAUDE.md) (cómo trabajamos y estado actual) y
 [docs/CONTEXTO_PROYECTO.md](docs/CONTEXTO_PROYECTO.md) (historia y decisiones del proyecto).
 

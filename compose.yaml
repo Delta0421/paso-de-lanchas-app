@@ -1,0 +1,113 @@
+# Entorno de desarrollo local de Paso de Lanchas.
+# Guía completa: docs/ENTORNO_DESARROLLO.md
+#
+#   docker compose up -d                  → base de datos, base de pruebas y correo de prueba
+#   docker compose --profile tools up -d  → además, Adminer (ver la base desde el navegador)
+#   docker compose --profile app up -d    → además, la app Next.js dentro de Docker
+#                                           (solo cuando ya exista package.json)
+#   docker compose down                   → apaga todo (los datos se conservan)
+#   docker compose down -v                → apaga y BORRA los datos locales
+#
+# Las contraseñas de aquí son solo para tu computadora. Nunca se usan en la nube.
+
+name: paso-de-lanchas
+
+services:
+  # Base de datos principal de desarrollo (misma versión mayor que Neon en la nube).
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-paso}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paso_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-paso_lanchas}
+      TZ: America/Mexico_City
+      PGTZ: America/Mexico_City
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Base de datos para pruebas automáticas (Vitest de integración y Playwright).
+  # Vive en memoria: se vacía cada vez que el contenedor se reinicia.
+  db-test:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paso
+      POSTGRES_PASSWORD: paso_test
+      POSTGRES_DB: paso_lanchas_test
+      TZ: America/Mexico_City
+      PGTZ: America/Mexico_City
+    ports:
+      - "${DB_TEST_PORT:-5433}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paso -d paso_lanchas_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Buzón de correo falso: atrapa los correos que manda la app (recuperar contraseña,
+  # verificación de cuenta) para verlos en http://localhost:8025 sin enviar nada real.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAIL_UI_PORT:-8025}:8025"
+      - "${SMTP_PORT:-1025}:1025"
+
+  # Visor de la base de datos en el navegador: http://localhost:8080
+  # Servidor: db · Usuario: paso · Contraseña: paso_dev · Base: paso_lanchas
+  adminer:
+    image: adminer:latest
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # La aplicación Next.js dentro de Docker (opcional). Úsala si no quieres instalar Node
+  # en tu computadora. Requiere que el proyecto Next.js ya exista (package.json).
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    command: sh -c "npm ci && npx prisma migrate deploy && npm run dev -- --hostname 0.0.0.0"
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      DATABASE_URL: postgresql://paso:paso_dev@db:5432/paso_lanchas?schema=public
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      # Windows no avisa a Docker de los cambios en archivos; con esto se recargan solos.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - app-node-modules:/app/node_modules
+      - app-next:/app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+volumes:
+  db-data:
+  app-node-modules:
+  app-next:
