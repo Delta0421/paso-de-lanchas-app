@@ -64,6 +64,9 @@ repositorio:
   `requireApiRole` en `src/lib/auth/require-role.ts` y `src/proxy.ts`. Uso en docs/MODULOS_Y_RESPONSABLES.md.
   **Seguridad del personal (#9):** bloqueo por intentos, computadoras autorizadas (admin/superadmin) e inactividad.
   Las demás pantallas por rol siguen temporales.
+- **Tarifas (#14, 2026-11-22):** dominio y casos de uso para configurar, consultar vigentes e historial; repositorio
+  Prisma que cierra la anterior y crea la nueva en una transacción; página `/admin/tarifas` protegida para ADMIN.
+  La fecha de inicio se establece al guardar; tarifas de seed siguen siendo aproximadas y pendientes de validar en campo.
 
 ## Stack (versiones instaladas)
 
@@ -153,6 +156,7 @@ npm run format             Prettier
 | 2026-11-22 | Omar (con Claude) | ADR 0002 aceptada: login propio (Argon2 + sesiones en BD, `requireRole` en servidor); se descartan Auth.js y Better Auth (#5) |
 | 2026-11-22 | Omar (con Claude) | Login por rol (#7): Argon2, sesiones en BD con hash del token y cookie HttpOnly, `requireRole`/`assertRole`/`requireApiRole`, `proxy.ts`, pantalla de login y cierre de sesión, bitácora; 40 pruebas unitarias y 10 de Playwright |
 | 2026-11-22 | Omar (con Claude) | Seguridad del personal (#9): bloqueo por intentos fallidos, computadoras autorizadas con cookie de dispositivo, cierre por inactividad, `dock_id` opcional en `authorized_devices`, script `dev:aprobar-computadoras` |
+| 2026-11-22 | Omar (con Copilot) | Tarifas (#14): dominio, cambio transaccional con vigencia e historial, validación de categorías/tipos, auditoría y página de administración protegida; se enlaza desde el panel admin |
 
 ## Registro de errores y soluciones
 
