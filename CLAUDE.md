@@ -65,6 +65,8 @@ repositorio:
   **Registro de pasajero (#6):** `/registro` y `/verificar-correo` con enlace de un solo uso por correo (Mailpit en
   local). **Contraseñas (#8):** `/recuperar` (enlace de 30 min, un solo uso, cierra todas las sesiones) y
   `/cuenta/cambiar-contrasena` (pide la actual; la contraseña temporal del personal obliga a cambiarla antes de seguir).
+- **Tarifa vigente (#15):** estrategias de dominio para lancha y transbordador; seleccionan la tarifa vigente en la hora
+  del abordaje y aplican descuento solo si está aprobado y no ha vencido.
   Las demás pantallas por rol siguen temporales.
 
 ## Stack (versiones instaladas)
@@ -157,6 +159,7 @@ npm run format             Prettier
 | 2026-11-22 | Omar (con Claude) | Seguridad del personal (#9): bloqueo por intentos fallidos, computadoras autorizadas con cookie de dispositivo, cierre por inactividad, `dock_id` opcional en `authorized_devices`, script `dev:aprobar-computadoras` |
 | 2026-11-22 | Omar (con Claude) | Registro de pasajero (#6): cuenta pendiente + monedero en $0 + enlace en una transacción, verificación de un solo uso, respuesta igual si el correo existe, correo por SMTP (nodemailer, Mailpit en local) |
 | 2026-11-23 | Omar (con Claude) | Recuperar y cambiar contraseña (#8): enlace de 30 min de un solo uso (máx. 3 cada 30 min), cierre de sesiones, contraseña temporal obligatoria de cambiar (`requireRole`/`assertRole`), aviso por correo del cambio, `InputError` compartido, cuentas de prueba e2e con `globalSetup` |
+| 2026-11-23 | Cova | Tarifa vigente (#15): Factory y estrategias de dominio para lancha y transbordador, vigencia de tarifas al abordar y descuento aprobado vigente |
 
 ## Registro de errores y soluciones
 
