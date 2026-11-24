@@ -12,6 +12,18 @@ export default async function PassengerPage() {
     <div className="mx-auto w-full max-w-2xl">
       <div className="space-y-3 px-6 pt-6">
         <Link
+          href="/pasajero/saldo"
+          className="border-brand/20 text-brand hover:border-brand flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-xs transition"
+        >
+          <div>
+            <p className="font-heading text-brand text-base font-bold">Mi saldo y movimientos</p>
+            <p className="text-ink-muted text-xs">
+              Consulta tu saldo, historial y comprobantes (RF-021 a RF-031)
+            </p>
+          </div>
+          <span className="text-brand text-sm font-bold">Abrir →</span>
+        </Link>
+        <Link
           href="/pasajero/cuenta"
           className="border-brand/20 text-brand hover:border-brand flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-xs transition"
         >

@@ -12,6 +12,18 @@ export default async function AdminPage() {
     <div className="mx-auto w-full max-w-2xl">
       <div className="px-6 pt-6">
         <Link
+          href="/admin/recargas"
+          className="border-brand/20 text-brand hover:border-brand mb-3 flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-xs transition"
+        >
+          <div>
+            <p className="font-heading text-brand text-base font-bold">Saldo y recargas</p>
+            <p className="text-ink-muted text-xs">
+              Recarga en efectivo o registra un reembolso o ajuste (RF-025 a RF-030)
+            </p>
+          </div>
+          <span className="text-brand text-sm font-bold">Abrir →</span>
+        </Link>
+        <Link
           href="/admin/descuentos"
           className="border-brand/20 text-brand hover:border-brand flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-xs transition"
         >

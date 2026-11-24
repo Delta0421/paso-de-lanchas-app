@@ -65,7 +65,9 @@ repositorio:
   **Registro de pasajero (#6):** `/registro` y `/verificar-correo` con enlace de un solo uso por correo (Mailpit en
   local). **Contraseñas (#8):** `/recuperar` (enlace de 30 min, un solo uso, cierra todas las sesiones) y
   `/cuenta/cambiar-contrasena` (pide la actual; la contraseña temporal del personal obliga a cambiarla antes de seguir).
-  Las demás pantallas por rol siguen temporales.
+  **Saldo y recargas (#37):** `/pasajero/saldo`, búsqueda y recarga en efectivo en `/admin/recargas`, reembolsos,
+  ajustes con motivo, comprobantes, límites configurables y caja abierta al primer cobro. El código quedó en la rama
+  `feature/37-saldo-y-recargas`; el push y PR los realiza Cova.
 - **Permisos en GitHub (2026-11-23, D26):** equipo `desarrollo` con permiso de escritura (los 5 suben sus ramas al
   repo); en `develop` todo entra por PR con la CI en verde y **solo Omar aprueba y fusiona** (`.github/CODEOWNERS`).
 
@@ -164,6 +166,7 @@ npm run format             Prettier
 | 2026-11-23 | Omar (con Claude) | Recuperar y cambiar contraseña (#8): enlace de 30 min de un solo uso (máx. 3 cada 30 min), cierre de sesiones, contraseña temporal obligatoria de cambiar (`requireRole`/`assertRole`), aviso por correo del cambio, `InputError` compartido, cuentas de prueba e2e con `globalSetup` |
 | 2026-11-22 | José | Issue #16 (revisión PR #23): eliminar `userId` oculto del formulario y obtener sesión en servidor con `requireRole`/`assertRole` |
 | 2026-11-23 | Omar (con Claude) | Permisos en GitHub (D26): equipo `desarrollo` con escritura, `.github/CODEOWNERS`, reglas de `develop` (PR obligatorio, CI en verde, aprobación de Omar); guía de contribución actualizada |
+| 2026-11-23 | Cova | Issue #37: saldo e historial paginado, top-up en efectivo con límites configurables, ajustes/reembolsos auditados, comprobante, caja automática en computadora autorizada y control de concurrencia optimista |
 
 ## Registro de errores y soluciones
 

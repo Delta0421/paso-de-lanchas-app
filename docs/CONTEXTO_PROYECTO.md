@@ -203,3 +203,13 @@ Este proyecto es **ingeniería de software**: todo código debe:
 - D26: equipo `desarrollo` con escritura; `develop` exige PR, CI en verde y la aprobación de Omar (`.github/CODEOWNERS`).
   Ahora también se puede completar el PR de `develop` → `main` (2 aprobaciones de personas con escritura).
 - Pendiente: actualizar el documento Word 02 «Flujo de trabajo en GitHub» (v1.2).
+
+### 2026-11-23 — Saldo, historial y recarga en efectivo (#37)
+- En la rama `feature/37-saldo-y-recargas`: dominio de saldo en centavos, validación de límites configurables
+  (`topup_min`/`topup_max`, con valores predeterminados de $10 y $2,000), historial paginado y aviso si el saldo es
+  menor que la tarifa general vigente de lancha.
+- Taquilla protegida para ADMIN: búsqueda por correo/celular, recarga en efectivo con caja abierta en la primera
+  operación desde computadora autorizada, reembolsos y ajustes con motivo obligatorio; movimiento, saldo posterior,
+  responsable y caja quedan registrados.
+- Las actualizaciones del saldo usan `version` para control optimista y reintentan conflictos. Las pruebas locales
+  cubren dominio, casos de uso y dos recargas concurrentes; el PR y la CI quedan pendientes de Cova.
