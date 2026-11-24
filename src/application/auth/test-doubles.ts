@@ -7,12 +7,145 @@ import type {
   AuthorizedDeviceRepository,
   AuthSettings,
   AuthSettingsProvider,
+  EmailMessage,
+  EmailTokenPurpose,
+  EmailTokenRepository,
+  Mailer,
+  PassengerRegistrationRepository,
   PasswordHasher,
+  PasswordRepository,
   SessionRepository,
   TokenService,
   UserCredentials,
   UserCredentialsRepository,
 } from "./ports";
+
+export function memoryMailer(): Mailer & { sent: EmailMessage[] } {
+  const sent: EmailMessage[] = [];
+  return { sent, send: async (message) => void sent.push(message) };
+}
+
+export interface MemoryAccount {
+  id: string;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  passwordHash: string;
+  status: UserCredentials["status"];
+  emailVerifiedAt: Date | null;
+  walletBalance: string | null;
+  mustChangePassword?: boolean;
+  lockedUntil?: Date | null;
+}
+
+export interface MemoryEmailToken {
+  id: string;
+  userId: string;
+  purpose: EmailTokenPurpose;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
+
+/**
+ * Cuentas, monederos, tokens por correo y sesiones en memoria (registro, verificación y
+ * contraseñas). `sessions` solo guarda de quién es cada sesión, para revisar cuáles se cierran.
+ */
+export function memoryAccounts(
+  accounts: MemoryAccount[] = [],
+  tokens: MemoryEmailToken[] = [],
+  sessions: { userId: string; tokenHash: string }[] = [],
+) {
+  const addToken = (token: Omit<MemoryEmailToken, "id" | "usedAt">) =>
+    void tokens.push({ ...token, id: `t-${tokens.length + 1}`, usedAt: null });
+  const byId = (id: string) => accounts.find((a) => a.id === id);
+  const keepSessions = (keep: (s: { userId: string; tokenHash: string }) => boolean) =>
+    sessions.splice(0, sessions.length, ...sessions.filter(keep));
+
+  const registration: PassengerRegistrationRepository = {
+    findAccountByEmail: async (email) => {
+      const account = accounts.find((a) => a.email === email);
+      return account
+        ? { id: account.id, fullName: account.fullName, status: account.status }
+        : null;
+    },
+    createPassenger: async (data) => {
+      if (accounts.some((a) => a.email === data.email)) return null;
+      const id = `u-${accounts.length + 1}`;
+      accounts.push({
+        id,
+        email: data.email,
+        fullName: data.fullName,
+        phone: data.phone,
+        passwordHash: data.passwordHash,
+        status: "PENDING_VERIFICATION",
+        emailVerifiedAt: null,
+        walletBalance: "0.00",
+      });
+      addToken({
+        userId: id,
+        purpose: "EMAIL_VERIFICATION",
+        tokenHash: data.verificationTokenHash,
+        expiresAt: data.verificationExpiresAt,
+      });
+      return { id };
+    },
+    addEmailToken: async (token) => addToken(token),
+  };
+
+  const emailTokens: EmailTokenRepository = {
+    findByHash: async (tokenHash, purpose) => {
+      const token = tokens.find((t) => t.tokenHash === tokenHash && t.purpose === purpose);
+      return token
+        ? { id: token.id, userId: token.userId, expiresAt: token.expiresAt, usedAt: token.usedAt }
+        : null;
+    },
+    consumeAndVerifyEmail: async (tokenId, userId, at) => {
+      const token = tokens.find((t) => t.id === tokenId);
+      if (!token || token.usedAt) return false;
+      token.usedAt = at;
+      const account = accounts.find((a) => a.id === userId);
+      if (account?.status === "PENDING_VERIFICATION") {
+        Object.assign(account, { status: "ACTIVE", emailVerifiedAt: at });
+      }
+      return true;
+    },
+  };
+
+  const passwords: PasswordRepository = {
+    findAccountByEmail: registration.findAccountByEmail,
+    countResetTokensExpiringAfter: async (userId, at) =>
+      tokens.filter(
+        (t) =>
+          t.userId === userId &&
+          t.purpose === "PASSWORD_RESET" &&
+          t.expiresAt.getTime() > at.getTime(),
+      ).length,
+    addResetToken: async (token) => addToken({ ...token, purpose: "PASSWORD_RESET" }),
+    findById: async (userId) => {
+      const account = byId(userId);
+      return account
+        ? { email: account.email, fullName: account.fullName, passwordHash: account.passwordHash }
+        : null;
+    },
+    resetWithToken: async (tokenId, userId, passwordHash, at) => {
+      const token = tokens.find((t) => t.id === tokenId);
+      if (!token || token.usedAt) return false;
+      for (const t of tokens) {
+        if (t.userId === userId && t.purpose === "PASSWORD_RESET" && !t.usedAt) t.usedAt = at;
+      }
+      Object.assign(byId(userId)!, { passwordHash, lockedUntil: null, mustChangePassword: false });
+      keepSessions((s) => s.userId !== userId);
+      return true;
+    },
+    changePassword: async (userId, passwordHash, keepSessionTokenHash) => {
+      Object.assign(byId(userId)!, { passwordHash, mustChangePassword: false });
+      keepSessions((s) => s.userId !== userId || s.tokenHash === keepSessionTokenHash);
+    },
+  };
+
+  return { accounts, tokens, sessions, registration, emailTokens, passwords };
+}
 
 export const fakeHasher: PasswordHasher = {
   hash: async (password) => `hash:${password}`,

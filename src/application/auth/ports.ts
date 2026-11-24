@@ -101,3 +101,89 @@ export interface TokenService {
   generate(): string;
   hash(token: string): string;
 }
+
+export type EmailTokenPurpose = "EMAIL_VERIFICATION" | "PASSWORD_RESET";
+
+/** Cuenta ya registrada con un correo (sin datos sensibles). */
+export interface ExistingAccount {
+  id: string;
+  fullName: string;
+  status: AccountStatus;
+}
+
+export interface PassengerRegistrationRepository {
+  findAccountByEmail(email: string): Promise<ExistingAccount | null>;
+  /**
+   * Crea, en una sola transacción, el pasajero en PENDING_VERIFICATION, su monedero en $0 y
+   * su token de verificación. Devuelve null si el correo ya estaba registrado.
+   */
+  createPassenger(data: {
+    email: string;
+    fullName: string;
+    phone: string;
+    passwordHash: string;
+    privacyAcceptedAt: Date;
+    verificationTokenHash: string;
+    verificationExpiresAt: Date;
+  }): Promise<{ id: string } | null>;
+  addEmailToken(token: {
+    userId: string;
+    purpose: EmailTokenPurpose;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void>;
+}
+
+export interface EmailTokenRecord {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
+
+export interface EmailTokenRepository {
+  findByHash(tokenHash: string, purpose: EmailTokenPurpose): Promise<EmailTokenRecord | null>;
+  /**
+   * Marca el token como usado y activa la cuenta (si estaba pendiente), en una transacción.
+   * Devuelve false si otra petición lo usó primero.
+   */
+  consumeAndVerifyEmail(tokenId: string, userId: string, at: Date): Promise<boolean>;
+}
+
+export interface EmailMessage {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}
+
+export interface Mailer {
+  send(message: EmailMessage): Promise<void>;
+}
+
+/** Recuperar y cambiar contraseña (RF-005, RF-006, RF-013). */
+export interface PasswordRepository {
+  /** Cuenta con ese correo (ya normalizado), sin las eliminadas. */
+  findAccountByEmail(email: string): Promise<ExistingAccount | null>;
+  /**
+   * Enlaces de recuperación de la cuenta (usados o no) que vencen después de `at`. Como todos
+   * duran lo mismo, son los que se crearon en los últimos 30 minutos.
+   */
+  countResetTokensExpiringAfter(userId: string, at: Date): Promise<number>;
+  addResetToken(token: { userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
+  /** Datos para verificar la contraseña actual y avisar del cambio por correo. */
+  findById(
+    userId: string,
+  ): Promise<{ email: string; fullName: string; passwordHash: string } | null>;
+  /**
+   * En una transacción: marca el enlace como usado (false si otra petición lo usó primero),
+   * invalida los demás enlaces de recuperación, guarda la nueva contraseña (ya no temporal), quita el bloqueo
+   * por intentos y borra TODAS las sesiones de la cuenta.
+   */
+  resetWithToken(tokenId: string, userId: string, passwordHash: string, at: Date): Promise<boolean>;
+  /**
+   * En una transacción: guarda la nueva contraseña, quita `must_change_password` y borra las
+   * demás sesiones (conserva la de `keepSessionTokenHash`).
+   */
+  changePassword(userId: string, passwordHash: string, keepSessionTokenHash: string): Promise<void>;
+}

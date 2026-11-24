@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { checkDevice, requiresAuthorizedDevice } from "@/domain/auth/authorized-device";
+import { normalizeEmail } from "@/domain/auth/email";
 import {
   hasLockout,
   isLocked,
@@ -8,7 +9,7 @@ import {
   minutesUntilUnlock,
   shouldLock,
 } from "@/domain/auth/lockout";
-import { redirectAfterLogin } from "@/domain/auth/roles";
+import { CHANGE_PASSWORD_PATH, redirectAfterLogin } from "@/domain/auth/roles";
 import { sessionExpiresAt } from "@/domain/auth/session-policy";
 import { DomainError } from "@/domain/shared/domain-error";
 
@@ -25,7 +26,7 @@ import type {
 } from "./ports";
 
 export const loginInputSchema = z.object({
-  email: z.string().trim().toLowerCase().max(120).pipe(z.email()),
+  email: z.string().max(120).transform(normalizeEmail).pipe(z.email()),
   password: z.string().min(1).max(256),
   next: z.string().max(300).optional(),
 });
@@ -222,7 +223,10 @@ export function createLogin(deps: LoginDeps) {
         role: user.role,
         mustChangePassword: user.mustChangePassword,
       },
-      redirectTo: redirectAfterLogin(user.role, next),
+      // Contraseña temporal (RF-013): primero tiene que cambiarla.
+      redirectTo: user.mustChangePassword
+        ? CHANGE_PASSWORD_PATH
+        : redirectAfterLogin(user.role, next),
     };
   };
 }
