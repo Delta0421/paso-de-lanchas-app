@@ -48,8 +48,8 @@ describe.skipIf(!prisma)("reglas de integridad en PostgreSQL", () => {
 
   it("cierra la tarifa anterior en la misma transacción y conserva ambas vigencias", async () => {
     const repository = prismaFareRepository(db);
-    const firstStart = new Date(Date.now() - 60_000);
     const nextStart = new Date();
+    const firstStart = new Date(nextStart.getTime() - 60_000);
     const fare = {
       vesselKind: "BOAT" as const,
       category: "GENERAL" as const,
