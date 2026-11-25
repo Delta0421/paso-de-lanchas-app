@@ -16,6 +16,7 @@ const prisma = url ? new PrismaClient({ adapter: new PrismaPg({ connectionString
 describe.skipIf(!prisma)("reglas de integridad en PostgreSQL", () => {
   const db = prisma!;
   let userId: string;
+  let vehicleTypeId: number;
 
   beforeAll(async () => {
     const user = await db.user.create({
@@ -26,10 +27,16 @@ describe.skipIf(!prisma)("reglas de integridad en PostgreSQL", () => {
       },
     });
     userId = user.id;
+    const vehicleType = await db.vehicleType.create({
+      data: { name: `test-${Date.now()}-${process.pid}` },
+      select: { id: true },
+    });
+    vehicleTypeId = vehicleType.id;
   });
 
   afterAll(async () => {
     await db.fare.deleteMany({ where: { createdById: userId } });
+    await db.vehicleType.delete({ where: { id: vehicleTypeId } });
     await db.wallet.deleteMany({ where: { userId } });
     await db.user.delete({ where: { id: userId } });
     await db.$disconnect();
@@ -51,9 +58,9 @@ describe.skipIf(!prisma)("reglas de integridad en PostgreSQL", () => {
     const nextStart = new Date();
     const firstStart = new Date(nextStart.getTime() - 60_000);
     const fare = {
-      vesselKind: "BOAT" as const,
-      category: "GENERAL" as const,
-      vehicleTypeId: null,
+      vesselKind: "FERRY" as const,
+      category: "VEHICLE" as const,
+      vehicleTypeId,
       validTo: null,
       createdById: userId,
     };
