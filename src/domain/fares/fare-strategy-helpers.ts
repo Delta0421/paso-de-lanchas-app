@@ -1,10 +1,11 @@
 import { DomainError } from "@/domain/shared/domain-error";
 
-import type { FareCategory, FareOption, FareVesselKind, ResolvedFare } from "./fare-strategy";
+import type { FareCategory, VesselKind } from "./fare";
+import type { FareOption, ResolvedFare } from "./fare-strategy";
 
 export function resolveCurrentFare(
   fares: readonly FareOption[],
-  vesselKind: FareVesselKind,
+  vesselKind: VesselKind,
   category: FareCategory,
   vehicleTypeId: number | null,
   at: Date,

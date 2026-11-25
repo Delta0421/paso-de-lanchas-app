@@ -183,6 +183,7 @@ npm run format             Prettier
 | 2026-11-24 | Omar (con Claude) | Cuentas del personal (#41): alta de admin/chofer con contraseña temporal de 12 caracteres (`crypto.randomInt`), desactivar con cierre de sesiones, reactivar, desbloquear y restablecer; nunca superadmins ni pasajeros; bitácora; `src/lib/mailer.ts` compartido; chofer `chofer.temporal` en el seed; ayudas e2e en `tests/e2e/auth-helpers.ts` |
 | 2026-11-24 | Omar (con Claude) | Computadoras del muelle (#42): pantalla del superadmin para aprobar (nombre y muelle; la del admin no puede quedar de oficina), renombrar y revocar (borra sus sesiones); columna `authorized_devices.requested_at`; `dev:aprobar-computadoras -- correo` para que las pruebas en paralelo no se crucen |
 | 2026-11-24 | Omar (con Claude) | Revisión de Cova a #55 y #56: cada cambio de cuentas del personal y de computadoras guarda su bitácora **en la misma transacción** (`ChangeAudit`, `auditLogData`); la acción de estado solo acepta DEACTIVATE/REACTIVATE; la computadora de un admin solo se aprueba para **su** muelle |
+| 2026-11-25 | Cova | #15: `fare-strategy` reutiliza `VesselKind` y `FareCategory` del dominio de tarifas, sin duplicar sus tipos |
 
 ## Registro de errores y soluciones
 

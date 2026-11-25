@@ -4,7 +4,8 @@ import { DomainError } from "@/domain/shared/domain-error";
 import { Money } from "@/domain/shared/money";
 
 import { createFareStrategy } from "./fare-strategy-factory";
-import type { FareOption, FareVesselKind } from "./fare-strategy";
+import type { VesselKind } from "./fare";
+import type { FareOption } from "./fare-strategy";
 
 const at = new Date("2026-11-22T18:00:00.000Z");
 
@@ -148,7 +149,7 @@ describe("createFareStrategy", () => {
   });
 
   it("rejects an unsupported vessel kind", () => {
-    expect(() => createFareStrategy("CROSSING" as FareVesselKind)).toThrowError(
+    expect(() => createFareStrategy("CROSSING" as VesselKind)).toThrowError(
       expect.objectContaining({ code: "INVALID_VESSEL_KIND" }),
     );
   });

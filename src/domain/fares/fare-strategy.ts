@@ -1,13 +1,13 @@
 import type { Money } from "@/domain/shared/money";
 
-export type FareVesselKind = "BOAT" | "FERRY";
-export type FareCategory = "GENERAL" | "STUDENT" | "INAPAM" | "PEDESTRIAN" | "VEHICLE";
+import type { FareCategory, VesselKind } from "./fare";
+
 export type DiscountType = "STUDENT" | "INAPAM";
 export type DiscountStatus = "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
 
 export interface FareOption {
   id: string;
-  vesselKind: FareVesselKind;
+  vesselKind: VesselKind;
   category: FareCategory;
   vehicleTypeId: number | null;
   amount: Money;
@@ -28,7 +28,7 @@ export interface FareStrategyInput {
 
 export interface ResolvedFare {
   fareId: string;
-  vesselKind: FareVesselKind;
+  vesselKind: VesselKind;
   category: FareCategory;
   vehicleTypeId: number | null;
   amount: Money;
