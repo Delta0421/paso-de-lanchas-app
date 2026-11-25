@@ -3,14 +3,24 @@
  * perder ninguna operación. Requiere `docker compose up -d` y `npm run db:test:prepare`.
  */
 import { PrismaPg } from "@prisma/adapter-pg";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { ChangeAudit } from "@/application/shared/ports";
 import { createTopUpCash } from "@/application/wallet/top-up-cash";
+import type { WalletMovementInput } from "@/application/wallet/ports";
+import { Money } from "@/domain/shared/money";
+import type { Prisma } from "@/generated/prisma/client";
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaWalletRepository } from "@/infrastructure/wallet/prisma-wallet-repository";
 
 const url = process.env.DATABASE_URL_TEST;
 const prisma = url ? new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) }) : null;
+
+class AnonymousAuditWalletRepository extends PrismaWalletRepository {
+  override credit(tx: Prisma.TransactionClient, input: WalletMovementInput, audit: ChangeAudit) {
+    return super.credit(tx, input, { ...audit, userId: null });
+  }
+}
 
 describe.skipIf(!prisma)("recargas de monedero concurrentes", () => {
   const db = prisma!;
@@ -89,12 +99,11 @@ describe.skipIf(!prisma)("recargas de monedero concurrentes", () => {
   });
 
   it("preserva ambas recargas, el saldo acumulado y un solo turno de caja", async () => {
-    const repo = new PrismaWalletRepository(db);
-    const audit = { log: vi.fn(async () => {}) };
-    const topUpCash = createTopUpCash({ repo, audit });
+    const repo = new AnonymousAuditWalletRepository(db);
+    const topUpCash = createTopUpCash({ repo });
     const actor = { adminId: adminId!, deviceId: deviceId! };
 
-    await Promise.all([
+    const topUps = await Promise.all([
       topUpCash({ passengerId, amount: "10.00" }, actor),
       topUpCash({ passengerId, amount: "10.00" }, actor),
     ]);
@@ -104,6 +113,12 @@ describe.skipIf(!prisma)("recargas de monedero concurrentes", () => {
       where: { walletId: wallet.id },
     });
     const shifts = await db.cashShift.findMany({ where: { adminId: adminId! } });
+    const auditEntries = await db.auditLog.findMany({
+      where: {
+        entity: "wallet_transactions",
+        entityId: { in: topUps.map(({ id }) => id) },
+      },
+    });
 
     expect(wallet.balance.toString()).toBe("20");
     expect(wallet.version).toBe(2);
@@ -111,6 +126,57 @@ describe.skipIf(!prisma)("recargas de monedero concurrentes", () => {
     expect(transactions.every((item) => item.type === "TOPUP_CASH")).toBe(true);
     expect(transactions.every((item) => item.cashShiftId === shifts[0]?.id)).toBe(true);
     expect(shifts).toHaveLength(1);
-    expect(audit.log).toHaveBeenCalledTimes(2);
+    expect(auditEntries).toHaveLength(2);
+    expect(auditEntries.every((entry) => entry.action === "WALLET_TOPUP_CASH")).toBe(true);
+    expect(auditEntries.every((entry) => entry.userId === null)).toBe(true);
+  });
+
+  it("rolls back the movement when inserting its audit entry fails", async () => {
+    const repo = new AnonymousAuditWalletRepository(db);
+    const walletBefore = await db.wallet.findUniqueOrThrow({
+      where: { userId: passengerId! },
+    });
+    const transactionCountBefore = await db.walletTransaction.count({
+      where: { walletId: walletBefore.id },
+    });
+    const shiftCountBefore = await db.cashShift.count({ where: { adminId: adminId! } });
+
+    await expect(
+      repo.withTransaction(async (tx) => {
+        const at = new Date();
+        const cashShiftId = await repo.ensureOpenCashShift(tx, {
+          adminId: adminId!,
+          deviceId: deviceId!,
+          at,
+        });
+        return repo.credit(
+          tx,
+          {
+            userId: passengerId!,
+            amount: Money.fromPesos("5.00"),
+            type: "TOPUP_CASH",
+            performedById: adminId!,
+            at,
+            reason: "Prueba de rollback",
+            cashShiftId,
+          },
+          {
+            userId: null,
+            action: "A".repeat(61),
+            details: { passengerId },
+          },
+        );
+      }),
+    ).rejects.toThrow();
+
+    const walletAfter = await db.wallet.findUniqueOrThrow({
+      where: { userId: passengerId! },
+    });
+    expect(walletAfter.balance.toString()).toBe(walletBefore.balance.toString());
+    expect(walletAfter.version).toBe(walletBefore.version);
+    expect(await db.walletTransaction.count({ where: { walletId: walletBefore.id } })).toBe(
+      transactionCountBefore,
+    );
+    expect(await db.cashShift.count({ where: { adminId: adminId! } })).toBe(shiftCountBefore);
   });
 });

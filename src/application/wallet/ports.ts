@@ -1,3 +1,4 @@
+import type { ChangeAudit } from "@/application/shared/ports";
 import type { Money } from "@/domain/shared/money";
 import type { TopUpLimits } from "@/domain/wallet/wallet";
 
@@ -79,9 +80,11 @@ export interface WalletRepository<TransactionContext = unknown> {
   credit(
     tx: TransactionContext,
     input: WalletMovementInput,
+    audit: ChangeAudit,
   ): Promise<WalletTransactionItem & { walletUserId: string }>;
   debit(
     tx: TransactionContext,
     input: WalletMovementInput,
+    audit: ChangeAudit,
   ): Promise<WalletTransactionItem & { walletUserId: string }>;
 }

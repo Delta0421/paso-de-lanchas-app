@@ -1,3 +1,4 @@
+import type { ChangeAudit } from "@/application/shared/ports";
 import type {
   OpenCashShiftInput,
   WalletMovementInput,
@@ -17,6 +18,7 @@ import {
 import { DomainError } from "@/domain/shared/domain-error";
 import { Money } from "@/domain/shared/money";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { auditLogData } from "@/infrastructure/audit/prisma-audit-logger";
 import { prisma } from "@/infrastructure/db/prisma";
 
 const PAGE_SIZE = 20;
@@ -293,6 +295,7 @@ export class PrismaWalletRepository implements WalletRepository<Prisma.Transacti
   credit(
     tx: Prisma.TransactionClient,
     input: WalletMovementInput,
+    audit: ChangeAudit,
   ): Promise<WalletTransactionItem & { walletUserId: string }> {
     if (input.type === "FARE_CHARGE") {
       throw new DomainError("INVALID_TRANSACTION_TYPE", "Un cobro de cruce debe ser un débito.");
@@ -303,12 +306,13 @@ export class PrismaWalletRepository implements WalletRepository<Prisma.Transacti
         "La recarga en efectivo necesita turno de caja.",
       );
     }
-    return this.move(tx, input, "CREDIT");
+    return this.move(tx, input, "CREDIT", audit);
   }
 
   debit(
     tx: Prisma.TransactionClient,
     input: WalletMovementInput,
+    audit: ChangeAudit,
   ): Promise<WalletTransactionItem & { walletUserId: string }> {
     if (input.type !== "FARE_CHARGE" && input.type !== "ADJUSTMENT") {
       throw new DomainError(
@@ -316,13 +320,14 @@ export class PrismaWalletRepository implements WalletRepository<Prisma.Transacti
         "Este movimiento no puede debitar el monedero.",
       );
     }
-    return this.move(tx, input, "DEBIT");
+    return this.move(tx, input, "DEBIT", audit);
   }
 
   private async move(
     tx: Prisma.TransactionClient,
     input: WalletMovementInput,
     direction: "CREDIT" | "DEBIT",
+    audit: ChangeAudit,
   ): Promise<WalletTransactionItem & { walletUserId: string }> {
     const wallet = await tx.wallet.findUnique({
       where: { userId: input.userId },
@@ -381,6 +386,13 @@ export class PrismaWalletRepository implements WalletRepository<Prisma.Transacti
         createdAt: input.at,
       },
       select: { ...transactionSelect, walletId: true },
+    });
+    await tx.auditLog.create({
+      data: auditLogData({
+        ...audit,
+        entity: "wallet_transactions",
+        entityId: transaction.id,
+      }),
     });
     return { ...mapTransaction(transaction), walletUserId: input.userId };
   }

@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { AuditLogger, Clock } from "@/application/shared/ports";
+import type { ChangeAudit, Clock } from "@/application/shared/ports";
 import { InputError } from "@/application/shared/input-error";
 import { DomainError } from "@/domain/shared/domain-error";
 import { Money } from "@/domain/shared/money";
@@ -45,6 +45,7 @@ class FakeWalletRepository implements WalletRepository<string> {
   debitCalls = 0;
   transactionCalls = 0;
   transactionReceipt = null;
+  auditEntries: ChangeAudit[] = [];
 
   async withTransaction<T>(work: (tx: string) => Promise<T>): Promise<T> {
     this.transactionCalls++;
@@ -93,7 +94,7 @@ class FakeWalletRepository implements WalletRepository<string> {
     return "shift-1";
   }
 
-  async credit(_tx: string, input: WalletMovementInput) {
+  async credit(_tx: string, input: WalletMovementInput, audit: ChangeAudit) {
     this.creditCalls++;
     if (this.creditFailure) throw this.creditFailure;
     if (this.creditConflicts > 0) {
@@ -101,13 +102,17 @@ class FakeWalletRepository implements WalletRepository<string> {
       throw new DomainError("CONCURRENT_UPDATE", "Conflicto de prueba.");
     }
     this.balanceCents = applyCredit(Money.fromCents(this.balanceCents), input.amount).cents;
-    return this.createTransaction(input, input.amount.cents);
+    const transaction = this.createTransaction(input, input.amount.cents);
+    this.auditEntries.push(audit);
+    return transaction;
   }
 
-  async debit(_tx: string, input: WalletMovementInput) {
+  async debit(_tx: string, input: WalletMovementInput, audit: ChangeAudit) {
     this.debitCalls++;
     this.balanceCents = applyDebit(Money.fromCents(this.balanceCents), input.amount).cents;
-    return this.createTransaction(input, -input.amount.cents);
+    const transaction = this.createTransaction(input, -input.amount.cents);
+    this.auditEntries.push(audit);
+    return transaction;
   }
 
   private createTransaction(input: WalletMovementInput, amountCents: number) {
@@ -124,10 +129,6 @@ class FakeWalletRepository implements WalletRepository<string> {
     this.transactions.unshift(item);
     return item;
   }
-}
-
-function createAudit(): AuditLogger {
-  return { log: vi.fn(async () => {}) };
 }
 
 describe("wallet use cases", () => {
@@ -194,8 +195,7 @@ describe("wallet use cases", () => {
 
   it("performs a cash top-up, opens a shift, and audits the movement", async () => {
     const repo = new FakeWalletRepository();
-    const audit = createAudit();
-    const topUpCash = createTopUpCash({ repo, audit, clock });
+    const topUpCash = createTopUpCash({ repo, clock });
 
     const transaction = await topUpCash(
       { passengerId: PASSENGER_ID, amount: "20.50" },
@@ -210,19 +210,23 @@ describe("wallet use cases", () => {
       balanceAfterCents: 3050,
       reason: "Recarga en efectivo",
     });
-    expect(audit.log).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(repo.auditEntries).toEqual([
+      {
+        userId: "admin-1",
         action: "WALLET_TOPUP_CASH",
-        entityId: TRANSACTION_ID,
-      }),
-    );
+        details: {
+          passengerId: PASSENGER_ID,
+          amountCents: 2050,
+          cashShiftId: "shift-1",
+        },
+      },
+    ]);
   });
 
   it("retries concurrent updates without duplicating audit entries", async () => {
     const repo = new FakeWalletRepository();
     repo.creditConflicts = 1;
-    const audit = createAudit();
-    const topUpCash = createTopUpCash({ repo, audit, clock });
+    const topUpCash = createTopUpCash({ repo, clock });
 
     await topUpCash(
       { passengerId: PASSENGER_ID, amount: "10" },
@@ -234,12 +238,12 @@ describe("wallet use cases", () => {
 
     expect(repo.transactionCalls).toBe(2);
     expect(repo.balanceCents).toBe(2000);
-    expect(audit.log).toHaveBeenCalledTimes(1);
+    expect(repo.auditEntries).toHaveLength(1);
   });
 
   it("rejects out-of-range cash top-ups and missing passengers", async () => {
     const repo = new FakeWalletRepository();
-    const topUpCash = createTopUpCash({ repo, audit: createAudit(), clock });
+    const topUpCash = createTopUpCash({ repo, clock });
 
     await expect(
       topUpCash(
@@ -266,7 +270,7 @@ describe("wallet use cases", () => {
   it("reports a conflict after exhausting retries", async () => {
     const repo = new FakeWalletRepository();
     repo.creditConflicts = 3;
-    const topUpCash = createTopUpCash({ repo, audit: createAudit(), clock });
+    const topUpCash = createTopUpCash({ repo, clock });
 
     await expect(
       topUpCash(
@@ -284,7 +288,7 @@ describe("wallet use cases", () => {
     const repo = new FakeWalletRepository();
     const failure = new Error("database unavailable");
     repo.creditFailure = failure;
-    const topUpCash = createTopUpCash({ repo, audit: createAudit(), clock });
+    const topUpCash = createTopUpCash({ repo, clock });
 
     await expect(
       topUpCash(
@@ -300,8 +304,7 @@ describe("wallet use cases", () => {
 
   it("credits refunds and debits adjustments with a mandatory reason", async () => {
     const repo = new FakeWalletRepository();
-    const audit = createAudit();
-    const adjustBalance = createAdjustBalance({ repo, audit, clock });
+    const adjustBalance = createAdjustBalance({ repo, clock });
 
     await adjustBalance(
       {
@@ -327,12 +330,31 @@ describe("wallet use cases", () => {
     expect(repo.balanceCents).toBe(1250);
     expect(adjustment.amountCents).toBe(-250);
     expect(repo.debitCalls).toBe(1);
-    expect(audit.log).toHaveBeenCalledTimes(2);
+    expect(repo.auditEntries).toEqual([
+      {
+        userId: "admin-1",
+        action: "WALLET_REFUND",
+        details: {
+          passengerId: PASSENGER_ID,
+          amountCents: 500,
+          reason: "Reembolso autorizado",
+        },
+      },
+      {
+        userId: "admin-1",
+        action: "WALLET_ADJUSTED",
+        details: {
+          passengerId: PASSENGER_ID,
+          amountCents: -250,
+          reason: "Corrección de saldo",
+        },
+      },
+    ]);
   });
 
   it("rejects a refund debit and an adjustment without a reason", async () => {
     const repo = new FakeWalletRepository();
-    const adjustBalance = createAdjustBalance({ repo, audit: createAudit(), clock });
+    const adjustBalance = createAdjustBalance({ repo, clock });
 
     await expect(
       adjustBalance(
@@ -364,7 +386,7 @@ describe("wallet use cases", () => {
   it("retries concurrent adjustments and rejects missing passengers", async () => {
     const repo = new FakeWalletRepository();
     repo.creditConflicts = 1;
-    const adjustBalance = createAdjustBalance({ repo, audit: createAudit(), clock });
+    const adjustBalance = createAdjustBalance({ repo, clock });
     await adjustBalance(
       {
         passengerId: PASSENGER_ID,
@@ -395,7 +417,7 @@ describe("wallet use cases", () => {
     const repo = new FakeWalletRepository();
     const failure = new Error("database unavailable");
     repo.creditFailure = failure;
-    const adjustBalance = createAdjustBalance({ repo, audit: createAudit(), clock });
+    const adjustBalance = createAdjustBalance({ repo, clock });
 
     await expect(
       adjustBalance(

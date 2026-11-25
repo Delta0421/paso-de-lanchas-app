@@ -1,34 +1,15 @@
-import type { AuditLogger, Clock } from "@/application/shared/ports";
+import type { ChangeAudit, Clock } from "@/application/shared/ports";
 import { systemClock } from "@/application/shared/ports";
 import { parseInput } from "@/application/shared/input-error";
 import { DomainError } from "@/domain/shared/domain-error";
 import { Money } from "@/domain/shared/money";
 
 import type { WalletRepository } from "./ports";
+import { retryConcurrentUpdate } from "./retry-concurrent-update";
 import { adjustBalanceSchema } from "./wallet-input";
-
-const MAX_CONCURRENT_RETRIES = 3;
-
-async function retryConcurrentUpdate<T>(operation: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt < MAX_CONCURRENT_RETRIES; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (!(error instanceof DomainError) || error.code !== "CONCURRENT_UPDATE") throw error;
-      if (attempt === MAX_CONCURRENT_RETRIES - 1) {
-        throw new DomainError(
-          "CONCURRENT_UPDATE",
-          "El saldo cambió varias veces. Revisa el movimiento e inténtalo de nuevo.",
-        );
-      }
-    }
-  }
-  throw new DomainError("CONCURRENT_UPDATE", "No se pudo actualizar el saldo.");
-}
 
 export function createAdjustBalance<TransactionContext>(deps: {
   repo: WalletRepository<TransactionContext>;
-  audit: AuditLogger;
   clock?: Clock;
 }) {
   const clock = deps.clock ?? systemClock;
@@ -51,6 +32,15 @@ export function createAdjustBalance<TransactionContext>(deps: {
 
     const amount = Money.fromPesos(parsed.amount);
     const at = clock.now();
+    const audit: ChangeAudit = {
+      userId: adminId,
+      action: parsed.type === "REFUND" ? "WALLET_REFUND" : "WALLET_ADJUSTED",
+      details: {
+        passengerId: passenger.id,
+        amountCents: parsed.direction === "CREDIT" ? amount.cents : -amount.cents,
+        reason: parsed.reason,
+      },
+    };
     const transaction = await retryConcurrentUpdate(() =>
       deps.repo.withTransaction((tx) => {
         const input = {
@@ -62,22 +52,10 @@ export function createAdjustBalance<TransactionContext>(deps: {
           reason: parsed.reason,
         };
         return parsed.direction === "CREDIT"
-          ? deps.repo.credit(tx, input)
-          : deps.repo.debit(tx, input);
+          ? deps.repo.credit(tx, input, audit)
+          : deps.repo.debit(tx, input, audit);
       }),
     );
-
-    await deps.audit.log({
-      userId: adminId,
-      action: parsed.type === "REFUND" ? "WALLET_REFUND" : "WALLET_ADJUSTED",
-      entity: "wallet_transactions",
-      entityId: transaction.id,
-      details: {
-        passengerId: passenger.id,
-        amountCents: transaction.amountCents,
-        reason: parsed.reason,
-      },
-    });
 
     return transaction;
   };

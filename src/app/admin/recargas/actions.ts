@@ -7,8 +7,6 @@ import { createSearchPassenger } from "@/application/wallet/search-passenger";
 import { createTopUpCash } from "@/application/wallet/top-up-cash";
 import type { PassengerWalletSummary } from "@/application/wallet/ports";
 import { DomainError } from "@/domain/shared/domain-error";
-import { prismaAuditLogger } from "@/infrastructure/audit/prisma-audit-logger";
-import { prisma } from "@/infrastructure/db/prisma";
 import { PrismaWalletRepository } from "@/infrastructure/wallet/prisma-wallet-repository";
 import { getCurrentSessionDeviceId } from "@/lib/auth/auth";
 import { assertRole } from "@/lib/auth/require-role";
@@ -67,10 +65,7 @@ export async function topUpCashAction(
       );
     }
     const repo = new PrismaWalletRepository();
-    const transaction = await createTopUpCash({
-      repo,
-      audit: prismaAuditLogger(prisma),
-    })(
+    const transaction = await createTopUpCash({ repo })(
       {
         passengerId: formData.get("passengerId"),
         amount: formData.get("amount"),
@@ -98,7 +93,6 @@ export async function adjustBalanceAction(
   try {
     const transaction = await createAdjustBalance({
       repo: new PrismaWalletRepository(),
-      audit: prismaAuditLogger(prisma),
     })(
       {
         passengerId: formData.get("passengerId"),
