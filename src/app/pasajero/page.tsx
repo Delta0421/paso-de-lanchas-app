@@ -4,9 +4,11 @@ import Link from "next/link";
 import { createGetDocksStatus } from "@/application/passenger-info/get-docks-status";
 import { systemClock } from "@/application/shared/ports";
 import { LogoutButton } from "@/components/logout-button";
+import { createPrismaBoardingQueries } from "@/infrastructure/boarding/prisma-boarding-queries";
 import { PrismaPassengerInfoRepository } from "@/infrastructure/passenger-info/prisma-passenger-info-repository";
 import { requireRole } from "@/lib/auth/require-role";
 
+import { BoardingNotice } from "./boarding-notice";
 import { DocksLiveBoard } from "./docks-live-board";
 
 export const metadata: Metadata = { title: "Pasajero" };
@@ -15,7 +17,10 @@ export default async function PassengerPage() {
   const user = await requireRole("PASSENGER");
   const repo = new PrismaPassengerInfoRepository();
   const getDocksStatus = createGetDocksStatus({ repo, clock: systemClock });
-  const initialStatus = await getDocksStatus();
+  const [initialStatus, currentBoarding] = await Promise.all([
+    getDocksStatus(),
+    createPrismaBoardingQueries().findCurrentPassengerBoarding(user.id),
+  ]);
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-6">
@@ -36,6 +41,13 @@ export default async function PassengerPage() {
           <LogoutButton />
         </div>
       </header>
+      <Link
+        href="/pasajero/qr"
+        className="bg-brand flex min-h-14 w-full items-center justify-center rounded-xl px-4 text-lg font-semibold text-white"
+      >
+        Mostrar mi QR
+      </Link>
+      <BoardingNotice initial={currentBoarding} />
 
       <DocksLiveBoard initialStatus={initialStatus} />
 
@@ -69,6 +81,19 @@ export default async function PassengerPage() {
               </p>
             </div>
             <span className="text-brand mt-3 text-xs font-bold">Ver historial →</span>
+          </Link>
+
+          <Link
+            href="/pasajero/saldo"
+            className="border-brand/20 hover:border-brand flex flex-col justify-between rounded-2xl border bg-white p-4 shadow-xs transition"
+          >
+            <div>
+              <p className="font-heading text-brand text-base font-bold">Mi saldo y movimientos</p>
+              <p className="text-ink-muted mt-1 text-xs">
+                Consulta tu saldo, historial y comprobantes (RF-021 a RF-031)
+              </p>
+            </div>
+            <span className="text-brand mt-3 text-xs font-bold">Consultar →</span>
           </Link>
 
           <Link
