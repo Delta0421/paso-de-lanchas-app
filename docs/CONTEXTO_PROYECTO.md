@@ -268,5 +268,17 @@ Este proyecto es **ingeniería de software**: todo código debe:
 - Pruebas: 20 escaneos simultáneos sobre 10 lugares dan exactamente 10 abordajes, 10 cobros y lugares 1 a 10 (sin el
   bloqueo la prueba falla); el mismo QR dos veces al mismo tiempo, o en dos muelles, se cobra una sola vez; si falla un
   paso a la mitad el saldo no cambia. Playwright: QR inventado, cobro con lugar 1, QR repetido y aviso al pasajero.
-- Pendiente al integrar: aplicar el horario de servicio (#47) y unificar la promoción de la siguiente salida con la de
-  la fila (#43, PR #58) cuando se fusione.
+- Integrado con la fila (#43): bloquea primero el muelle y luego la salida (el mismo orden que la fila) y pasa la
+  siguiente con `pickNextInQueue` / `reorderQueue`. Pendiente: aplicar el horario de servicio (#47) al escanear.
+
+### 2026-11-27 — Consulta de la bitácora (#69)
+- `/superadmin/bitacora` (solo `SUPERADMIN`): tabla de 50 registros por página, la más reciente primero, con fecha en
+  hora de México, usuario, acción (con nombre en español), sobre qué, computadora y detalle.
+- Filtros en la dirección (`usuario`, `accion`, `desde`, `hasta`, `pagina`), validados con Zod uno por uno. Lo
+  inválido se ignora y se avisa, así que un enlace alterado nunca truena la página. "Hasta" incluye todo su día
+  (México es UTC-6 todo el año).
+- El detalle oculta en cualquier nivel las llaves que parezcan contraseña, token, secreto, hash, cookie o tarjeta.
+- La base ya impedía modificar o borrar (trigger `audit_logs_immutable`); ahora una prueba de integración lo confirma.
+- Lo que hoy registra la bitácora (RF-122): inicios y cierres de sesión, rechazos, registro, contraseñas, cuentas del
+  personal, computadoras, recargas, reembolsos, ajustes, tarifas, embarcaciones, fila y salidas. Con el #67 ya se
+  registran el cobro del cruce y el QR rechazado; faltan las de choferes (#66) y cancelaciones (#59), que llegan con sus PRs.
