@@ -65,6 +65,9 @@ repositorio:
   **Registro de pasajero (#6):** `/registro` y `/verificar-correo` con enlace de un solo uso por correo (Mailpit en
   local). **Contraseñas (#8):** `/recuperar` (enlace de 30 min, un solo uso, cierra todas las sesiones) y
   `/cuenta/cambiar-contrasena` (pide la actual; la contraseña temporal del personal obliga a cambiarla antes de seguir).
+  **Saldo y recargas (#37):** `/pasajero/saldo`, búsqueda y recarga en efectivo en `/admin/recargas`, reembolsos,
+  ajustes con motivo, comprobantes, límites configurables y caja abierta al primer cobro. El código quedó en la rama
+  `feature/37-saldo-y-recargas`; el push y PR los realiza Cova.
   Las demás pantallas por rol siguen temporales.
 - **Tarifas (#14, 2026-11-22):** dominio y casos de uso para configurar, consultar vigentes e historial; repositorio
   Prisma que cierra la anterior y crea la nueva en una transacción; página `/admin/tarifas` protegida para ADMIN.
@@ -172,6 +175,7 @@ npm run format             Prettier
 | 2026-11-23 | Omar (con Claude) | Recuperar y cambiar contraseña (#8): enlace de 30 min de un solo uso (máx. 3 cada 30 min), cierre de sesiones, contraseña temporal obligatoria de cambiar (`requireRole`/`assertRole`), aviso por correo del cambio, `InputError` compartido, cuentas de prueba e2e con `globalSetup` |
 | 2026-11-22 | José | Issue #16 (revisión PR #23): eliminar `userId` oculto del formulario y obtener sesión en servidor con `requireRole`/`assertRole` |
 | 2026-11-23 | Omar (con Claude) | Permisos en GitHub (D26): equipo `desarrollo` con escritura, `.github/CODEOWNERS`, reglas de `develop` (PR obligatorio, CI en verde, aprobación de Omar); guía de contribución actualizada |
+| 2026-11-23 | Cova | Issue #37: saldo e historial paginado, top-up en efectivo con límites configurables, ajustes/reembolsos auditados en la misma transacción, comprobante, caja automática en computadora autorizada y control de concurrencia optimista |
 | 2026-11-22 | Omar (con Copilot) | Tarifas (#14): dominio, cambio transaccional con vigencia e historial, validación de categorías/tipos, auditoría y página de administración protegida; se enlaza desde el panel admin |
 | 2026-11-23 | José | Issue #40: galería de vehículos del pasajero con normalización de placas, tarifa vigente por tipo, borrado lógico, vistas `/pasajero/vehiculos` y endpoint `GET /api/pasajero/vehiculos` (RF-039 a RF-042) |
 | 2026-11-23 | José | Issue #48: tablero en vivo de muelles con actualización cada 10 s (`GET /api/pasajero/muelles`), tiempos estimados de salida/llegada (`eta.ts`), horarios, tarifas vigentes (`crossing_minutes` en seed) e historial paginado de viajes (RF-082 a RF-087) |
